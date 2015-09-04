@@ -22,6 +22,7 @@ import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.StringReader;
 import java.io.UnsupportedEncodingException;
@@ -465,7 +466,35 @@ public class Execute {
             if (watchdog != null) {
                 watchdog.stop();
             }
+
+            // Before we destroy the process (and thus close all of the input streams) wait while available() on each stream returns
+            // something > 0 indicating that there is still data that could be read from the stream.  This should finish in all
+            // cases because the streamHandler's pumper should be reading bytes until it blocks.  We have to do this instead
+            // of joining the stream pumper thread because if we join the thread we'll join it blocked on the read call
+            // which will be blocked indefinitely, particularly on Windows platforms.
+            // We can also be certain that once available reaches 0 there is no more data to be read because we know
+            // for certain that the process has already exited.
+            try {
+                for (InputStream is : new InputStream[] {process.getInputStream(), process.getErrorStream() }) {
+                    while (is.available() > 0)
+                        Thread.sleep(100); // Allow the other thread to read some data
+                }
+            }
+            catch (InterruptedException e) {
+                // Assuming something is trying to get us to stop waiting?
+            }
+
+            // Use process.destroy() to close all of the streams which has a special way of closing
+            // on some platforms that ensures read will return -1 rather than failing with an exception.
+            process.destroy();
+
+            // Tell the streamHandler to stop, which has the side effect of joining the threads.  If
+            // they were still blocked on a read we'd hang here forever (bug 5003), but because we now
+            // call destroy all blocked calls should have been completed so joining the thread should
+            // be almost instantaneous.
             streamHandler.stop();
+
+            // Just for good measure, ensure all three streams got a close call from us.
             closeStreams(process);
 
             if (watchdog != null) {

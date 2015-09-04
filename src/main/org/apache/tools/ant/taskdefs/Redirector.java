@@ -778,7 +778,9 @@ public class Redirector {
      */
     public ExecuteStreamHandler createHandler() throws BuildException {
         createStreams();
-        final boolean nonBlockingRead = input == null && inputString == null;
+        // There is never a case when we need "non-blocking" reads now that we have
+        // the Execute class calling Process.destroy before calling stop which joins the threads.
+        final boolean nonBlockingRead = false; // input == null && inputString == null;
         return new PumpStreamHandler(getOutputStream(), getErrorStream(),
                 getInputStream(), nonBlockingRead);
     }

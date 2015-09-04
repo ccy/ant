@@ -264,7 +264,7 @@ public class PumpStreamHandler implements ExecuteStreamHandler {
      */
     protected Thread createPump(InputStream is, OutputStream os,
                                 boolean closeWhenExhausted) {
-        return createPump(is, os, closeWhenExhausted, true);
+        return createPump(is, os, closeWhenExhausted, false);
     }
 
     /**
